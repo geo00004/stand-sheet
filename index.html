@@ -392,6 +392,8 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 
     <!-- New show panel -->
     <div id="show-new-panel" style="display:none">
+      <span class="show-label">New Show Name</span>
+      <input type="text" id="new-show-name-input" placeholder="e.g. Tonight's Show">
       <span class="show-label">Start fresh — optionally load a previous show's Count Out as your starting Count In</span>
       <select id="show-select">
         <option value="">— Start blank —</option>
@@ -937,7 +939,10 @@ function openNewShow() {
   document.getElementById('show-save-panel').style.display = 'none';
   document.getElementById('show-new-panel').style.display = '';
   populateShowList();
+  const nameInput = document.getElementById('new-show-name-input');
+  nameInput.value = '';
   document.getElementById('show-overlay').classList.add('active');
+  setTimeout(() => nameInput.focus(), 50);
 }
 
 function closeShowOverlay() {
@@ -961,8 +966,10 @@ function confirmSaveShow() {
 }
 
 function confirmNewShow() {
+  const name = document.getElementById('new-show-name-input').value.trim();
   const selected = document.getElementById('show-select').value;
-  if(!confirm('Start a new show? Current counts will be cleared.')) return;
+  if(!name) { alert('Please enter a show name.'); return; }
+  if(!confirm('Start "' + name + '"? Current counts will be cleared.')) return;
 
   // Clear current counts
   Object.keys(counts).forEach(k => delete counts[k]);
@@ -989,8 +996,8 @@ function confirmNewShow() {
     localStorage.removeItem('lp_prev_show');
   }
 
-  localStorage.setItem('lp_current_show', '');
-  updateCurrentShowDisplay(selected ? 'New Show · From: ' + selected : 'New Show');
+  localStorage.setItem('lp_current_show', name);
+  updateCurrentShowDisplay(selected ? name + ' · From: ' + selected : name);
   save();
   closeShowOverlay();
 
