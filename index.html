@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stand Sheet">
+<meta name="theme-color" content="#16213e">
+<link rel="manifest" id="pwa-manifest">
+<title>Lamppost Cocktail — Stand Sheet</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; color: #e8e8f0; min-height: 100vh; }
+
+/* ── STICKY HEADER STACK ── */
+#top-header {
+  background: #16213e; border-bottom: 2px solid #e2b04a;
+  padding: 8px 12px 0; position: sticky; top: 0; z-index: 200;
+}
+#top-header h1 { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #e2b04a; }
+#top-header p  { font-size: 10px; color: #7777aa; margin-top: 1px; }
+
+/* sheet-tabs removed */
+
+/* Phase bar: Count In / Count Out */
+#phase-bar {
+  background: #0d0d1e; border-bottom: 2px solid #1e1e3e;
+  display: flex; position: sticky; top: 72px; z-index: 190;
+}
+.phase-tab {
+  flex: 1; padding: 8px 4px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; text-align: center;
+  cursor: pointer; color: #555577; border-right: 1px solid #1e1e3e;
+  border-bottom: 3px solid transparent; transition: all 0.15s;
+}
+.phase-tab:last-child { border-right: none; }
+.phase-tab.active { color: #e2b04a; border-bottom-color: #e2b04a; background: #111128; }
+
+/* Sub-tabs: Storage / Cooler */
+#subtab-bar {
+  background: #0a0a1a; border-bottom: 1px solid #1a1a36;
+  display: flex; position: sticky; top: 111px; z-index: 185;
+}
+.subtab {
+  flex: 1; padding: 6px 4px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; text-align: center;
+  cursor: pointer; color: #444466; border-right: 1px solid #1a1a36;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.subtab:last-child { border-right: none; }
+.subtab.active { color: #60c090; border-bottom-color: #60c090; }
+
+/* Controls */
+.controls {
+  display: flex; gap: 6px; padding: 6px 10px;
+  background: #0a0a1a; flex-wrap: wrap; align-items: center;
+  border-bottom: 1px solid #1a1a36; position: sticky; top: 144px; z-index: 180;
+}
+.btn {
+  padding: 5px 10px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  border: none; border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.btn-sort   { background: #e2b04a; color: #1a1a2e; }
+.btn-sort:hover { background: #f0c060; }
+.btn-revert { background: #0f3460; color: #e2b04a; border: 1px solid #e2b04a; }
+.btn-revert:hover { background: #1a4a80; }
+.btn-clear  { background: #2a1010; color: #e06060; border: 1px solid #703030; }
+.btn-clear:hover { background: #3a1818; }
+.sort-label { font-size: 10px; color: #444466; margin-left: auto; font-style: italic; }
+
+/* Progress */
+.progress-wrap {
+  padding: 0 10px 4px; background: #0a0a1a;
+  position: sticky; top: 177px; z-index: 170;
+  border-bottom: 1px solid #111128;
+}
+.progress-bar  { height: 2px; background: #1a1a2e; border-radius: 2px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg,#e2b04a,#40c070); border-radius: 2px; transition: width 0.3s; }
+.progress-text { font-size: 9px; color: #444466; text-align: right; padding-top: 2px; }
+
+/* ── COLUMN HEADERS (sticky) ── */
+.col-hdr {
+  display: grid; gap: 3px; padding: 5px 10px 4px;
+  background: #111128; border-bottom: 1px solid #252545;
+  position: sticky; top: 192px; z-index: 160;
+}
+/* Count In - Storage:  #, Name, Storage inputs..., [Cooler ref], Total */
+/* Count In - Cooler:   #, Name, [Storage ref], Cooler inputs..., Total */
+/* Count Out - Storage: #, Name, [Ct.In ref], Storage inputs..., [Cooler ref], Total */
+/* Count Out - Cooler:  #, Name, [Ct.In ref], [Storage ref], Cooler inputs..., Total */
+.col-hdr.in-storage  { grid-template-columns: 24px 1fr 54px 54px; }
+.col-hdr.in-cooler   { grid-template-columns: 24px 1fr 54px 54px; }
+.col-hdr.out-storage { grid-template-columns: 24px 1fr 54px 54px 54px; }
+.col-hdr.out-cooler  { grid-template-columns: 24px 1fr 54px 54px 54px; }
+
+.ch { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #555577; text-align: center; }
+.ch.left  { text-align: left; }
+.ch.gold  { color: #e2b04a; }
+.ch.blue  { color: #60a0e0; }
+.ch.green { color: #60c090; }
+
+/* ── SECTIONS ── */
+.view { display: none; padding-bottom: 80px; }
+.view.active { display: block; }
+
+/* ── ITEM BLOCKS ── */
+.item-block { border-bottom: 2px solid #111128; transition: background 0.1s; }
+.item-block:hover { background: #1a1a30; }
+.item-block.green  { background: #081a0e; }
+.item-block.green:hover { background: #0c2214; }
+.item-block.yellow { background: #1c1808; }
+.item-block.yellow:hover { background: #24200a; }
+
+/* Top row: # | name | [ref cells] | total */
+.item-top {
+  display: grid; gap: 4px; align-items: center;
+  padding: 7px 10px 2px;
+}
+.in-storage  .item-top { grid-template-columns: 24px 1fr 54px; }
+.in-cooler   .item-top { grid-template-columns: 24px 1fr 54px 54px; }
+.out-storage .item-top { grid-template-columns: 24px 1fr 54px 54px; }
+.out-cooler  .item-top { grid-template-columns: 24px 1fr 54px 54px 54px; }
+
+/* Input row: spacer | 4 inputs side by side | spacer cols matching refs+total */
+.item-inputs {
+  display: grid; gap: 4px; align-items: center;
+  padding: 0 10px 7px;
+}
+.in-storage  .item-inputs { grid-template-columns: 24px repeat(4,1fr) 54px; }
+.in-cooler   .item-inputs { grid-template-columns: 24px repeat(4,1fr) 54px 54px; }
+.out-storage .item-inputs { grid-template-columns: 24px repeat(4,1fr) 54px 54px; }
+.out-cooler  .item-inputs { grid-template-columns: 24px repeat(4,1fr) 54px 54px 54px; }
+
+.item-num  { font-size: 10px; color: #353558; font-weight: 700; text-align: right; }
+.item-name { font-size: 12px; color: #c0c0da; line-height: 1.3; }
+.item-name small { display: block; font-size: 9px; color: #404060; margin-top: 1px; }
+
+/* Read-only reference cells */
+.ref-cell {
+  text-align: center; font-size: 13px; font-weight: 800;
+  background: #080818; border: 1px solid #181838;
+  border-radius: 4px; padding: 5px 2px; color: #303050;
+}
+.ref-cell.has-val { color: #e2b04a; border-color: #3a3010; }
+.ref-cell.blue-ref.has-val { color: #60a0e0; border-color: #103060; }
+
+/* Editable inputs */
+.ci {
+  width: 100%; padding: 5px 1px; font-size: 13px; font-weight: 700;
+  text-align: center; background: #0d0d22; border: 1px solid #252545;
+  border-radius: 4px; color: #e8e8f0; -moz-appearance: textfield;
+}
+.ci::-webkit-outer-spin-button, .ci::-webkit-inner-spin-button { -webkit-appearance: none; }
+.ci:focus { outline: none; border-color: #e2b04a; background: #111128; }
+.ci.filled { border-color: #30a060; color: #50d080; }
+
+/* Total cell */
+.total-cell {
+  text-align: center; font-size: 13px; font-weight: 800;
+  background: #0a0a1a; border: 1px solid #1a1a3a;
+  border-radius: 4px; padding: 5px 2px; color: #404060;
+}
+.total-cell.has-val { color: #e2b04a; border-color: #3a3010; }
+
+/* Custom keg name input */
+.custom-name-input {
+  background: transparent; border: none; border-bottom: 1px solid #353558;
+  color: #c0c0da; font-size: 12px; font-weight: 700; width: 100%;
+  padding: 1px 0; outline: none;
+}
+.custom-name-input::placeholder { color: #353558; font-style: italic; font-weight: 400; }
+.custom-name-input:focus { border-bottom-color: #e2b04a; }
+
+/* Category headers */
+.cat-hdr {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
+  color: #e2b04a; padding: 12px 10px 5px;
+  border-bottom: 1px solid #252540; display: flex;
+  justify-content: space-between; align-items: center; background: #12122a;
+}
+.cat-count { font-size: 10px; color: #404060; font-weight: 400; letter-spacing: 0; }
+
+/* ── TRANSCRIBE OVERLAY ── */
+#transcribe-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: #0d0d1e; flex-direction: column;
+}
+#transcribe-overlay.active { display: flex; }
+
+#transcribe-header {
+  background: #16213e; border-bottom: 2px solid #e2b04a;
+  padding: 10px 14px; display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+#transcribe-header h2 { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #e2b04a; flex: 1; }
+#transcribe-close {
+  padding: 5px 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; border: 1px solid #e2b04a; border-radius: 4px;
+  background: transparent; color: #e2b04a; cursor: pointer;
+}
+#transcribe-close:hover { background: #e2b04a; color: #1a1a2e; }
+
+/* tst removed */
+
+.transcribe-col-hdr {
+  display: grid;
+  grid-template-columns: 28px 1fr 52px 52px 52px 52px;
+  gap: 3px; padding: 6px 12px 5px;
+  background: #111128; border-bottom: 1px solid #252545;
+  flex-shrink: 0;
+}
+.transcribe-col-hdr .ch { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #555577; text-align: center; }
+.transcribe-col-hdr .ch.left { text-align: left; }
+
+#transcribe-body { overflow-y: auto; flex: 1; padding-bottom: 20px; }
+
+.tr-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 52px 52px 52px 52px;
+  gap: 3px; align-items: center;
+  padding: 7px 12px; border-bottom: 1px solid #111128;
+}
+.tr-row.has-data { background: #081a0e; }
+.tr-num  { font-size: 10px; color: #353558; font-weight: 700; text-align: right; }
+.tr-name { font-size: 12px; color: #c0c0da; line-height: 1.3; }
+.tr-name small { display: block; font-size: 9px; color: #404060; margin-top: 1px; }
+.tr-val {
+  text-align: center; font-size: 13px; font-weight: 800;
+  background: #0a0a1a; border: 1px solid #181838;
+  border-radius: 4px; padding: 5px 2px; color: #353558;
+}
+.tr-val.has-val { color: #e2b04a; border-color: #3a3010; }
+.tr-val.blue.has-val { color: #60a0e0; border-color: #103060; }
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #0d0d1e; border-top: 2px solid #1a1a3a;
+  padding: 7px 12px; display: flex;
+  justify-content: space-between; align-items: center;
+  font-size: 11px; color: #444466; z-index: 300;
+}
+.save-banner strong { color: #e2b04a; }
+</style>
+</head>
+<body>
+
+<div id="top-header">
+  <h1>Lamppost Cocktail · Stand Sheet</h1>
+  <p>6/28/2026 · Wynonna Judd &amp; Melissa Etheridge · 8:00 AM</p>
+
+</div>
+
+<div id="phase-bar">
+  <div class="phase-tab active" onclick="switchPhase('in')">Count In</div>
+  <div class="phase-tab"        onclick="switchPhase('out')">Count Out</div>
+</div>
+
+<div id="subtab-bar">
+  <div class="subtab active" onclick="switchSubtab('storage')">Storage</div>
+  <div class="subtab"        onclick="switchSubtab('cooler')">Cooler</div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-sort"   onclick="sortItems()">↕ Sort by Category</button>
+  <button class="btn btn-revert" onclick="revertOrder()">↩ Sheet Order</button>
+  <button class="btn btn-clear"  onclick="clearView()">✕ Clear</button>
+  <span class="sort-label" id="sort-label">Sheet order</span>
+</div>
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+  <div class="progress-text" id="ptext">—</div>
+</div>
+
+<!--
+  4 views total: in-storage, in-cooler, out-storage, out-cooler
+  Each sheet (C / NC) gets its own list div inside.
+-->
+
+<!-- COUNT IN · STORAGE -->
+<div id="view-in-storage" class="view active">
+  <div class="col-hdr in-storage">
+    <div class="ch">#</div>
+    <div class="ch left">Item · tap inputs below each item</div>
+    <div class="ch gold">Total</div>
+  </div>
+  <div id="list-in-storage-ALL" class="in-storage"></div>
+</div>
+
+<!-- COUNT IN · COOLER -->
+<div id="view-in-cooler" class="view">
+  <div class="col-hdr in-cooler">
+    <div class="ch">#</div>
+    <div class="ch left">Item · tap inputs below each item</div>
+    <div class="ch blue">Storage</div>
+    <div class="ch gold">Total</div>
+  </div>
+  <div id="list-in-cooler-ALL" class="in-cooler"></div>
+</div>
+
+<!-- COUNT OUT · STORAGE -->
+<div id="view-out-storage" class="view">
+  <div class="col-hdr out-storage">
+    <div class="ch">#</div>
+    <div class="ch left">Item · tap inputs below each item</div>
+    <div class="ch blue">Ct. In</div>
+    <div class="ch gold">Total</div>
+  </div>
+  <div id="list-out-storage-ALL" class="out-storage"></div>
+</div>
+
+<!-- COUNT OUT · COOLER -->
+<div id="view-out-cooler" class="view">
+  <div class="col-hdr out-cooler">
+    <div class="ch">#</div>
+    <div class="ch left">Item · tap inputs below each item</div>
+    <div class="ch blue">Ct. In</div>
+    <div class="ch blue">Storage</div>
+    <div class="ch gold">Total</div>
+  </div>
+  <div id="list-out-cooler-ALL" class="out-cooler"></div>
+</div>
+
+<!-- TRANSCRIBE OVERLAY -->
+<div id="transcribe-overlay">
+  <div id="transcribe-header">
+    <h2>📋 Transcribe — Sheet Order</h2>
+    <button id="transcribe-close" onclick="closeTranscribe()">✕ Close</button>
+  </div>
+
+  <div class="transcribe-col-hdr">
+    <div class="ch">#</div>
+    <div class="ch left">Item</div>
+    <div class="ch" style="color:#60c090">In Storage</div>
+    <div class="ch" style="color:#60c090">In Cooler</div>
+    <div class="ch" style="color:#60a0e0">Out Storage</div>
+    <div class="ch" style="color:#60a0e0">Out Cooler</div>
+  </div>
+  <div id="transcribe-body">
+    <div id="tr-list-ALL"></div>
+  </div>
+</div>
+
+<div class="save-banner">
+  <span>Auto-saved</span>
+  <button onclick="openTranscribe()" style="padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;border:1px solid #60a0e0;border-radius:4px;background:transparent;color:#60a0e0;cursor:pointer;">📋 Transcribe</button>
+  <strong id="filled-count">—</strong>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────
+// storOnly:true = Storage tab only, no cooler
+const CHARGEABLE = [
+  {n:1,  name:"Chips/Pretzel Assortment",                    cat:"Cups & Merchandise", sub:"POS Menu Item",      storOnly:true},
+  {n:2,  name:"Cup, 10 oz Clear",                            cat:"Cups & Merchandise", sub:"50x20sleeve 1000/cs",storOnly:true, sortKey:1},
+  {n:3,  name:"Cup, 16 oz Clear",                            cat:"Cups & Merchandise", sub:"20pks of 50, 1000/cs",storOnly:true, sortKey:2},
+  {n:4,  name:"Soda, Coke 20oz",                             cat:"Soda",               sub:"EACH"},
+  {n:5,  name:"Soda, Coke Zero 20oz",                        cat:"Soda",               sub:"EACH"},
+  {n:6,  name:"Cup, 9 oz Wine Squat",                        cat:"Cups & Merchandise", sub:"Pet Squat 1000/cs",  storOnly:true},
+  {n:7,  name:"Cup, 10 oz Greenware",                        cat:"Cups & Merchandise", sub:"1000/cs",            storOnly:true, sortKey:3},
+  {n:8,  name:"Cup, 16 oz Greenware Green Stripe",           cat:"Cups & Merchandise", sub:"1000/cs",            storOnly:true, sortKey:4},
+  {n:9,  name:"Soda, Diet Coke 20oz",                        cat:"Soda",               sub:"EACH"},
+  {n:10, name:"Fiddlehead 12x19.2oz",                        cat:"Beer",               sub:"EACH"},
+  {n:11, name:"Cup, Mason Jar",                              cat:"Cups & Merchandise", sub:"EACH",               storOnly:true},
+  {n:12, name:"Poland Springs 24/.5L",                       cat:"Beer",               sub:"24/cs"},
+  {n:13, name:"Soda, Seagrams Ginger Ale 20oz",              cat:"Soda",               sub:"EACH"},
+  {n:14, name:"Simply Spiked Peach",                         cat:"Beer",               sub:"EACH"},
+  {n:15, name:"Souvenir Koozie",                             cat:"Cups & Merchandise", sub:"EACH",               storOnly:true},
+  {n:16, name:"Soda, Sprite 20oz",                           cat:"Soda",               sub:"EACH"},
+  {n:17, name:"Water, Dasani Plastic 24/20oz",               cat:"Beer",               sub:"EACH"},
+  {n:18, name:"Allagash White 12x19.2oz",                    cat:"Beer",               sub:"EACH"},
+  {n:19, name:"Athletic Free Wave N/A 15x19.2oz",            cat:"Beer",               sub:"EACH"},
+  {n:20, name:"Athletic Run Wild N/A 15x19.2oz",             cat:"Beer",               sub:"EACH"},
+  {n:21, name:"Chloe Prosecco Split 24x187ml",               cat:"White Wine",         sub:"EACH"},
+  {n:22, name:"Chloe Rose 12x750ml",                         cat:"Rosé",               sub:"EACH"},
+  {n:23, name:"Cowboy Hat / Beer Holder",                    cat:"Cups & Merchandise", sub:"25 per case",        storOnly:true},
+  {n:24, name:"Equilibrium Mc2 24x16oz",                     cat:"Beer",               sub:"EACH"},
+  {n:25, name:"Garage Beer Light 12x24oz",                   cat:"Beer",               sub:"EACH"},
+  {n:26, name:"Garage Beer Lime 12x24oz",                    cat:"Beer",               sub:"EACH"},
+  {n:27, name:"Happy Dad Fruit Punch 12/24oz",               cat:"Beer",               sub:"CASE"},
+  {n:28, name:"Happy Dad Hard Lemonade 12x24oz",             cat:"Beer",               sub:"EACH"},
+  {n:29, name:"High Noon Peach Vodka & Soda 12x700ml",       cat:"Beer",               sub:"EACH"},
+  {n:30, name:"High Noon Pineapple Vodka & Soda 12x700ml",   cat:"Beer",               sub:"EACH"},
+  {n:31, name:"Hudson North Cider Big Apple 12/19.2oz",      cat:"Beer",               sub:"CASE"},
+  {n:32, name:"Juice, Orange 24/7.2oz",                      cat:"Bar Mix & Juices",   sub:"CASE",   storOnly:true},
+  {n:33, name:"Liquid Fables Little Red Riding Hood 24x12oz", cat:"Beer",              sub:"EACH"},
+  {n:34, name:"Liquid Fables Summer in a Can 24x12oz",       cat:"Beer",               sub:"EACH"},
+  {n:35, name:"Lucky One Blueberry Lemonade 24x475ml",       cat:"Beer",               sub:"EACH"},
+  {n:36, name:"Lucky One Sweet Tea 24x475ml",                cat:"Beer",               sub:"EACH"},
+  {n:37, name:"Narragansett Lager 12/24oz",                  cat:"Beer",               sub:"EACH 12/24oz"},
+  {n:38, name:"Outlaw Light Beer 12x24oz",                   cat:"Beer",               sub:"EACH"},
+  {n:39, name:"Robert Mondavi Chardonnay 12x750ml",          cat:"White Wine",         sub:"EACH"},
+  {n:40, name:"Roscoe OTG Lager",                            cat:"Beer",               sub:"POS Menu Item"},
+  {n:41, name:"Sloop Juice Bomb 24/16oz",                    cat:"Beer",               sub:"EACH"},
+  {n:42, name:"Surfside Lemonade 12 cans",                   cat:"Beer",               sub:"CASE"},
+  {n:43, name:"Surfside Tea Half & Half 12 cans",            cat:"Beer",               sub:"CASE"},
+  {n:44, name:"Talk House Grapefruit Tequila 24x12oz",       cat:"Beer",               sub:"EACH"},
+  {n:45, name:"Talk House Lime Vodka 24x12oz",               cat:"Beer",               sub:"EACH"},
+  {n:46, name:"WBC American Ale 24pk",                       cat:"Beer",               sub:"CASE"},
+  {n:47, name:"WBC Anniversary Ale 24pk",                    cat:"Beer",               sub:"CASE"},
+  {n:48, name:"WBC Hard Seltzer 24pk",                       cat:"Beer",               sub:"CASE"},
+  {n:49, name:"WBC Hard Tea 24pk",                           cat:"Beer",               sub:"CASE"},
+];
+
+const NON_CHARGEABLE = [
+  {n:1,  name:"Ammunition Straight Bourbon Whiskey",         cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:2,  name:"Aviation Gin 84 1Ltr",                        cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:3,  name:"Bacardi Rum RSV Ocho 8yr 80",                 cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:4,  name:"Bacardi Rum Superior White 1Ltr",             cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:5,  name:"Bar Mix, Lemon X Sour Mix 4/1 gal",           cat:"Bar Mix & Juices", sub:"EACH LTR", storOnly:true},
+  {n:6,  name:"Beefeater Gin 88 1Ltr",                       cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:9,  name:"Bootlegger Vodka",                            cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:10, name:"Captain Morgan Rum Spiced 70 1Ltr",           cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:11, name:"Carpano Antica Formula Vermouth",             cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:12, name:"Casa Noble Tequila Blanco 80 6x750ml",        cat:"Liquor",  sub:"EACH 750ml",     storOnly:true},
+  {n:14, name:"Club Soda Btl 12x1L",                         cat:"Bar Mix & Juices",   sub:"EACH 12/1 Liter", storOnly:true},
+  {n:15, name:"Cosmo OTR 750ml",                             cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:16, name:"Crown Royal Canadian 80 1Ltr",                cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:17, name:"Dark Horse Chardonnay",                       cat:"White Wine",  sub:"EACH 750ml"},
+  {n:18, name:"Dark Horse Rose",                             cat:"Rosé",        sub:"EACH 750ml"},
+  {n:19, name:"Dark Horse Sauvignon Blanc",                  cat:"White Wine",  sub:"EACH"},
+  {n:20, name:"Dekuyper Triple Sec",                         cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:21, name:"Dewars White Label 80 1Ltr",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:22, name:"Espresso Martini OTR 375ml",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:23, name:"Espresso Martini OTR 750ml",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:24, name:"Grenadine Plastic 12/1ltr",                   cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:26, name:"Hennessy Cognac VS 12/1Ltr",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:28, name:"Hornitos Tequila Plata 1Ltr",                 cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:29, name:"Jack Daniels Black 12/1Ltr",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:30, name:"Jameson Irish Whiskey 1L (12/cs)",            cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:31, name:"Jim Beam Bourbon 80 1LTR",                    cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:32, name:"Jim Beam Peach",                              cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:33, name:"Jim Beam Pineapple",                          cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:34, name:"Johnnie Walker Black 80 1LTR",                cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:35, name:"Juice Pineapple Can 24/7.2oz",                cat:"Bar Mix & Juices", sub:"EACH",   storOnly:true},
+  {n:36, name:"Maggio Cabernet",                             cat:"Red Wine",    sub:"EACH"},
+  {n:37, name:"Maggio Chardonnay",                           cat:"White Wine",  sub:"EACH"},
+  {n:38, name:"Maggio Pinot Noir",                           cat:"Red Wine",    sub:"EACH"},
+  {n:39, name:"Mai Tai OTR 375ml",                           cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:40, name:"Makers Mark Bourbon 90 1Ltr",                 cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:41, name:"Malibu Rum",                                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:42, name:"Grenadine 12x25oz",                           cat:"Liquor",  sub:"EACH 12/25oz",   storOnly:true},
+  {n:43, name:"Mr. Boston Blue Curacao",                     cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:44, name:"Lemon Drop OTR 750ml",                        cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:45, name:"Pinnacle Vodka 1L",                           cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:47, name:"Tito's Handmade Vodka 80 1Ltr",               cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:48, name:"Tonic Water 24x10oz",                         cat:"Bar Mix & Juices",   sub:"EACH 24/10oz",   storOnly:true},
+  {n:49, name:"Archetype Sauvignon Blanc 12x750ml",          cat:"White Wine",  sub:"EACH"},
+  {n:50, name:"Bourbon, Pollinator 1/750",                   cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:51, name:"Bulleit Bourbon 12x1L",                       cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:52, name:"Casa Noble Tequila Reposado 80 750ml",        cat:"Liquor",  sub:"EACH 750ml",     storOnly:true},
+  {n:53, name:"", cat:"Kegs", sub:"", storOnly:true, custom:true, customLabel:"Keg 1"},
+  {n:54, name:"Familia Camerena Tequila Silver 12/cs",       cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:55, name:"Juice, Cranberry 12/32oz",                    cat:"Bar Mix & Juices", sub:"EACH",   storOnly:true},
+  {n:56, name:"Lalo Tequila Blanco 6x1L",                    cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:57, name:"New Amsterdam Gin 12x750mL",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:58, name:"Pollinator Gin",                              cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:59, name:"Pollinator, Catskill Rye",                    cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:60, name:"Robert Mondavi Cabernet The Reserve",         cat:"Red Wine",    sub:"EACH"},
+  {n:61, name:"RumHaven Coconut Rum 12x1L",                  cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:62, name:"Silver Gate Cabernet 12x750ml",               cat:"Red Wine",    sub:"EACH"},
+  {n:63, name:"Silver Gate Pinot Grigio 12x750ml",           cat:"White Wine",  sub:"EACH"},
+  {n:64, name:"Silver Gate Pinot Noir 12x750ml",             cat:"Red Wine",    sub:"EACH"},
+  {n:65, name:"Silver Gate Rose 12x750ml",                   cat:"Rosé",        sub:"EACH"},
+  {n:66, name:"Svedka Vodka 80 12x1L",                       cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:67, name:"Vermouth Dry – Martini & Rossi Extra Dry",    cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:68, name:"Vermouth Sweet – Martini & Rossi Rosso",      cat:"Liquor",  sub:"EACH LTR",       storOnly:true},
+  {n:69, name:"Vodka, Pollinator 9 case 1/750",              cat:"Liquor",  sub:"EACH",           storOnly:true},
+  {n:70, name:"", cat:"Kegs", sub:"", storOnly:true, custom:true, customLabel:"Keg 2"},
+  {n:71, name:"", cat:"Kegs", sub:"", storOnly:true, custom:true, customLabel:"Keg 3"},
+  {n:72, name:"", cat:"Kegs", sub:"", storOnly:true, custom:true, customLabel:"Keg 4"},
+];
+
+// Unified item list — all items regardless of sheet
+const ALL_ITEMS = [
+  ...CHARGEABLE.map(i=>({...i, sheet:'C'})),
+  ...NON_CHARGEABLE.map(i=>({...i, sheet:'NC'}))
+];
+
+const EXTRA = 3;
+const NEEDS_BOTH = new Set(['Beer','White Wine','Rosé','Red Wine','Soda']);
+// Wine subcats always sort A-Z by name
+const WINE_CATS = new Set(['White Wine','Rosé','Red Wine','Bar Mix & Juices']);
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let activeSheet  = 'ALL'; // unified
+let activePhase  = 'in';   // 'in' | 'out'
+let activeSubtab = 'storage'; // 'storage' | 'cooler'
+const sortedState = {};  // key: "sheet-phase-subtab" -> bool
+const counts = {};
+
+function load() { try { const s=localStorage.getItem('lp_ss3'); if(s) Object.assign(counts,JSON.parse(s)); } catch(e){} }
+function save() { try { localStorage.setItem('lp_ss3', JSON.stringify(counts)); } catch(e){} }
+
+// Custom keg names stored separately
+function getCustomName(sheet, n) { return counts['customname|ALL|'+n] || ''; }
+function setCustomName(sheet, n, val) {
+  if(val) counts['customname|ALL|'+n]=val;
+  else delete counts['customname|ALL|'+n];
+  save();
+  // sync name into all rendered instances of this item
+  document.querySelectorAll('.custom-name-display-'+sheet+'-'+n).forEach(el => el.textContent = val || el.dataset.placeholder);
+}
+
+// ── KEY / VALUE HELPERS ───────────────────────────────────────────────
+// field: 'storage' | 'cooler' | 'storage_x0' etc.
+function ky(sheet, phase, n, field) { return sheet+'|'+phase+'|'+n+'|'+field; }
+function getV(sheet, phase, n, field) { return counts[ky(sheet,phase,n,field)] ?? ''; }
+function setV(sheet, phase, n, field, val) {
+  const key = ky(sheet,phase,n,field);
+  if(val===''||val===null) delete counts[key]; else counts[key]=val;
+  save();
+  refreshAll(sheet, n);
+  updateProgress();
+}
+
+function sumF(sheet, phase, n, base) {
+  let t = parseFloat(counts[ky(sheet,phase,n,base)]||0);
+  for(let r=0;r<EXTRA;r++) t += parseFloat(counts[ky(sheet,phase,n,base+'_x'+r)]||0);
+  return t;
+}
+function hasF(sheet, phase, n, base) {
+  if((counts[ky(sheet,phase,n,base)]??'')!=='') return true;
+  for(let r=0;r<EXTRA;r++) if((counts[ky(sheet,phase,n,base+'_x'+r)]??'')!=='') return true;
+  return false;
+}
+
+// Grand total for a phase (storage + cooler across all extra rows)
+function grandTotal(sheet, phase, n) {
+  return sumF(sheet,phase,n,'storage') + sumF(sheet,phase,n,'cooler');
+}
+function grandHas(sheet, phase, n) {
+  return hasF(sheet,phase,n,'storage') || hasF(sheet,phase,n,'cooler');
+}
+
+// ── COLOR ─────────────────────────────────────────────────────────────
+function needsBoth(sheet, n) {
+  const item = ALL_ITEMS.find(i=>i.sheet===sheet && i.n===n);
+  return item && NEEDS_BOTH.has(item.cat);
+}
+function blockColor(sheet, phase, n) {
+  const sf = hasF(sheet,phase,n,'storage');
+  const cf = hasF(sheet,phase,n,'cooler');
+  if(needsBoth(sheet,n)) {
+    if(sf&&cf)  return 'green';
+    if(sf||cf)  return 'yellow';
+    return '';
+  }
+  return (sf||cf) ? 'green' : '';
+}
+
+// ── REFRESH all displayed cells for item n across all views ───────────
+function refreshAll(sheet, n) {
+  // sheet here is the item's own sheet key (C or NC)
+  ['in','out'].forEach(phase => {
+    const sTotal = sumF(sheet,phase,n,'storage');
+    const cTotal = sumF(sheet,phase,n,'cooler');
+    const sf = hasF(sheet,phase,n,'storage');
+    const cf = hasF(sheet,phase,n,'cooler');
+
+    // Update each subtab's total cell independently
+    const storageTel = document.getElementById('gtotal-storage|'+sheet+'|'+phase+'|'+n);
+    if(storageTel) { storageTel.textContent=sf?sTotal:'—'; storageTel.classList.toggle('has-val',sf); }
+    const coolerTel = document.getElementById('gtotal-cooler|'+sheet+'|'+phase+'|'+n);
+    if(coolerTel) { coolerTel.textContent=cf?cTotal:'—'; coolerTel.classList.toggle('has-val',cf); }
+
+    // storage-ref cell shown in cooler tab
+    const sref = document.getElementById('sref|'+sheet+'|'+phase+'|'+n);
+    if(sref) { sref.textContent=sf?sTotal:'—'; sref.classList.toggle('has-val',sf); }
+
+    // count-in ref shown in count-out tabs
+    if(phase==='in') {
+      const inGt  = grandTotal(sheet,'in',n);
+      const inHas = grandHas(sheet,'in',n);
+      ['storage','cooler'].forEach(sub => {
+        const iref = document.getElementById('inref|'+sheet+'|out-'+sub+'|'+n);
+        if(iref) { iref.textContent=inHas?inGt:'—'; iref.classList.toggle('has-val',inHas); }
+      });
+    }
+
+    // Block colors
+    ['storage','cooler'].forEach(sub => {
+      const blk = document.getElementById('blk|'+sheet+'|'+phase+'-'+sub+'|'+n);
+      if(blk) {
+        blk.classList.remove('green','yellow');
+        const c = blockColor(sheet,phase,n);
+        if(c) blk.classList.add(c);
+      }
+    });
+  });
+}
+
+// ── PROGRESS ──────────────────────────────────────────────────────────
+function updateProgress() {
+  const data = ALL_ITEMS;
+  let filled=0;
+  data.forEach(item => {
+    if(grandHas(activeSheet, activePhase, item.n)) filled++;
+  });
+  const pct = Math.round(filled/data.length*100);
+  document.getElementById('pfill').style.width = pct+'%';
+  document.getElementById('ptext').textContent = filled+' of '+data.length+' touched · '+pct+'%';
+  document.getElementById('filled-count').textContent = filled+' filled';
+}
+
+// Returns true if the current sheet has ANY items that need a cooler
+function sheetHasCooler() {
+  return ALL_ITEMS.some(i=>!i.storOnly);
+}
+
+// Show/hide cooler subtab button based on sheet
+function updateCoolerTab() {
+  const hasCooler = sheetHasCooler();
+  const coolerBtn = document.querySelectorAll('.subtab')[1];
+  coolerBtn.style.display = hasCooler ? '' : 'none';
+  // If cooler is hidden and we're on it, jump to storage
+  if(!hasCooler && activeSubtab==='cooler') {
+    activeSubtab='storage';
+    document.querySelectorAll('.subtab')[0].classList.add('active');
+    coolerBtn.classList.remove('active');
+  }
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────
+function currentViewId() { return 'view-'+activePhase+'-'+activeSubtab; }
+
+// switchSheet removed — unified view
+
+function switchPhase(phase) {
+  activePhase = phase;
+  document.querySelectorAll('.phase-tab').forEach((t,i)=>t.classList.toggle('active',['in','out'][i]===phase));
+  showView();
+  updateProgress();
+}
+
+function switchSubtab(sub) {
+  activeSubtab = sub;
+  document.querySelectorAll('.subtab').forEach((t,i)=>t.classList.toggle('active',['storage','cooler'][i]===sub));
+  showView();
+}
+
+function showView() {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(currentViewId()).classList.add('active');
+  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
+  document.getElementById('sort-label').textContent = sortedState[sk] ? 'Sorted A–Z' : 'Sheet order';
+}
+
+function sortItems() {
+  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
+  sortedState[sk]=true;
+  renderView(activeSheet, activePhase, activeSubtab);
+  document.getElementById('sort-label').textContent='A–Z within category';
+}
+function revertOrder() {
+  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
+  sortedState[sk]=false;
+  renderView(activeSheet, activePhase, activeSubtab);
+  document.getElementById('sort-label').textContent='Sheet order within category';
+}
+function clearView() {
+  const label = activeSubtab==='storage' ? 'storage' : 'cooler';
+  if(!confirm('Clear all '+activePhase+' '+label+' counts?')) return;
+  const data = ALL_ITEMS;
+  data.forEach(item => {
+    const is = item.sheet || 'C';
+    const base = activeSubtab;
+    [base, ...Array.from({length:EXTRA},(_,r)=>base+'_x'+r)].forEach(f => {
+      delete counts[ky(is, activePhase, item.n, f)];
+    });
+  });
+  save();
+  renderView(activeSheet, activePhase, activeSubtab);
+  updateProgress();
+}
+
+// ── INPUT ROW HTML (all 4 inputs horizontal) ─────────────────────────
+// Returns the .item-inputs row: spacer | input0..3 | spacer cols for refs/total
+function inputRowHTML(sh, phase, n, base, gridClass) {
+  // build all 4 input cells (main + 3 extras) horizontally
+  const fields = [base, base+'_x0', base+'_x1', base+'_x2'];
+  const sheet = sh; // alias for ky() calls
+  const inputCells = fields.map(f => {
+    const v = counts[ky(sh,phase,n,f)] ?? '';
+    return `<input type="number" class="ci${v!==''?' filled':''}" value="${v}" placeholder="—" inputmode="numeric"
+      onchange="setV('${sheet}','${phase}',${n},'${f}',this.value);this.classList.toggle('filled',this.value!=='')"
+      oninput="setV('${sheet}','${phase}',${n},'${f}',this.value);this.classList.toggle('filled',this.value!=='')" >`;
+  }).join('');
+  // trailing spacers: one per ref+total column (total cell gets its own spacer, refs each get one)
+  const spacers = gridClass==='in-storage'  ? '<div></div>'
+                : gridClass==='in-cooler'   ? '<div></div><div></div>'
+                : gridClass==='out-storage' ? '<div></div><div></div>'
+                : '<div></div><div></div><div></div>'; // out-cooler
+  return `<div class="item-inputs"><div></div>${inputCells}${spacers}</div>`;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────
+function renderView(sheet, phase, subtab) {
+  const data = ALL_ITEMS;
+  const containerId = 'list-'+phase+'-'+subtab+'-ALL';
+  const container   = document.getElementById(containerId);
+  container.innerHTML = '';
+  const gridClass = phase+'-'+subtab;
+  const sk = 'ALL-'+phase+'-'+subtab;
+
+  // Category display order
+  const CAT_ORDER = ['Cups & Merchandise','Soda','Beer','Kegs','White Wine','Rosé','Red Wine','Bar Mix & Juices','Liquor'];
+  function catRank(c) { const i=CAT_ORDER.indexOf(c); return i===-1?99:i; }
+
+  let items = [...data];
+  // Cooler tab: skip storage-only items
+  if(subtab==='cooler') items = items.filter(i=>!i.storOnly);
+  // Sort: always by category order; wines always A-Z; others by name if sorted flag set, else sheet order
+  items.sort((a,b)=>{
+    const cr = catRank(a.cat)-catRank(b.cat);
+    if(cr!==0) return cr;
+    if(WINE_CATS.has(a.cat)) return a.name.localeCompare(b.name);
+    if(a.sortKey !== undefined && b.sortKey !== undefined) return a.sortKey - b.sortKey;
+    if(sortedState[sk]) return a.name.localeCompare(b.name);
+    return a.n-b.n;
+  });
+
+  let lastCat = null;
+  items.forEach(item => {
+    if(item.cat!==lastCat) {
+      lastCat=item.cat;
+      const cnt=items.filter(i=>i.cat===item.cat).length;
+      const hdr=document.createElement('div');
+      hdr.className='cat-hdr';
+      hdr.innerHTML=`<span>${item.cat}</span><span class="cat-count">${cnt} items</span>`;
+      container.appendChild(hdr);
+    }
+
+    const base    = subtab; // 'storage' or 'cooler'
+    const isheet  = item.sheet || sheet; // use item's own sheet for count keys
+    const mainVal = getV(isheet,phase,item.n,base);
+    const hasMv   = mainVal!=='';
+    const baseSum = sumF(isheet,phase,item.n,base);
+    const basHas  = hasF(isheet,phase,item.n,base);
+
+    // Cross-references
+    const sTotal  = sumF(isheet,phase,item.n,'storage');
+    const cTotal  = sumF(isheet,phase,item.n,'cooler');
+    const sf      = hasF(isheet,phase,item.n,'storage');
+    const cf      = hasF(isheet,phase,item.n,'cooler');
+    const gt      = sTotal+cTotal;
+    const gtHas   = sf||cf;
+
+    const inGt    = grandTotal(isheet,'in',item.n);
+    const inHas   = grandHas(isheet,'in',item.n);
+
+    const color = blockColor(isheet,phase,item.n);
+    const blk = document.createElement('div');
+    blk.className = 'item-block'+(color?' '+color:'');
+    blk.id = 'blk|'+isheet+'|'+phase+'-'+subtab+'|'+item.n;
+
+    // Name cell — editable for custom kegs
+    const customName = item.custom ? getCustomName(isheet, item.n) : '';
+    const nameHTML = item.custom
+      ? `<div class="item-name">
+           <input type="text" class="custom-name-input" value="${customName}"
+             placeholder="${item.customLabel}"
+             onchange="setCustomName('${isheet}',${item.n},this.value)"
+             oninput="setCustomName('${isheet}',${item.n},this.value)">
+           <small>Keg</small>
+         </div>`
+      : `<div class="item-name">${item.name}<small>${item.sub}</small></div>`;
+
+    // ── top row: # | name | [ref cells] | total ──
+    // Total cell ID encodes the subtab so storage/cooler tabs have separate cells
+    const tid = 'gtotal-'+subtab+'|'+isheet+'|'+phase+'|'+item.n;
+    let topHTML = '';
+    if(phase==='in' && subtab==='storage') {
+      topHTML = `
+        <div class="item-num">${item.n}</div>
+        ${nameHTML}
+        <div class="total-cell${basHas?' has-val':''}" id="${tid}">${basHas?baseSum:'—'}</div>`;
+
+    } else if(phase==='in' && subtab==='cooler') {
+      topHTML = `
+        <div class="item-num">${item.n}</div>
+        ${nameHTML}
+        <div class="ref-cell${sf?' has-val':''}" id="sref|${isheet}|${phase}|${item.n}">${sf?sTotal:'—'}</div>
+        <div class="total-cell${basHas?' has-val':''}" id="${tid}">${basHas?baseSum:'—'}</div>`;
+
+    } else if(phase==='out' && subtab==='storage') {
+      topHTML = `
+        <div class="item-num">${item.n}</div>
+        ${nameHTML}
+        <div class="ref-cell blue-ref${inHas?' has-val':''}" id="inref|${isheet}|out-storage|${item.n}">${inHas?inGt:'—'}</div>
+        <div class="total-cell${basHas?' has-val':''}" id="${tid}">${basHas?baseSum:'—'}</div>`;
+
+    } else { // out-cooler
+      topHTML = `
+        <div class="item-num">${item.n}</div>
+        ${nameHTML}
+        <div class="ref-cell blue-ref${inHas?' has-val':''}" id="inref|${isheet}|out-cooler|${item.n}">${inHas?inGt:'—'}</div>
+        <div class="ref-cell${sf?' has-val':''}" id="sref|${isheet}|${phase}|${item.n}">${sf?sTotal:'—'}</div>
+        <div class="total-cell${basHas?' has-val':''}" id="${tid}">${basHas?baseSum:'—'}</div>`;
+    }
+
+    blk.innerHTML = `
+      <div class="item-top">${topHTML}</div>
+      ${inputRowHTML(isheet, phase, item.n, base, gridClass)}`;
+    container.appendChild(blk);
+  });
+}
+
+// ── TRANSCRIBE ────────────────────────────────────────────────────────
+let transcribeSheet = 'C';
+
+function openTranscribe() {
+  renderTranscribe('ALL');
+  document.getElementById('transcribe-overlay').classList.add('active');
+}
+function closeTranscribe() {
+  document.getElementById('transcribe-overlay').classList.remove('active');
+}
+// switchTranscribeSheet removed
+
+function renderTranscribe(sheet) {
+  const data = ALL_ITEMS.slice().sort((a,b)=>a.n-b.n);
+  const container = document.getElementById('tr-list-ALL');
+  container.innerHTML = '';
+
+  data.forEach(item => {
+    const is   = item.sheet || 'C';
+    const inS  = sumF(is,'in', item.n,'storage');
+    const inC  = sumF(is,'in', item.n,'cooler');
+    const outS = sumF(is,'out',item.n,'storage');
+    const outC = sumF(is,'out',item.n,'cooler');
+    const hasInS  = hasF(is,'in', item.n,'storage');
+    const hasInC  = hasF(is,'in', item.n,'cooler');
+    const hasOutS = hasF(is,'out',item.n,'storage');
+    const hasOutC = hasF(is,'out',item.n,'cooler');
+    const anyData = hasInS||hasInC||hasOutS||hasOutC;
+
+    const displayName = item.custom ? (getCustomName(is, item.n) || item.customLabel) : item.name;
+    const row = document.createElement('div');
+    row.className = 'tr-row'+(anyData?' has-data':'');
+    row.innerHTML = `
+      <div class="tr-num">${item.n}</div>
+      <div class="tr-name">${displayName}<small>${item.sub}</small></div>
+      <div class="tr-val${hasInS?' has-val':''}">${hasInS?inS:'—'}</div>
+      <div class="tr-val${hasInC?' has-val':''}">${item.storOnly?'—':(hasInC?inC:'—')}</div>
+      <div class="tr-val blue${hasOutS?' has-val':''}">${hasOutS?outS:'—'}</div>
+      <div class="tr-val blue${hasOutC?' has-val':''}">${item.storOnly?'—':(hasOutC?outC:'—')}</div>`;
+    container.appendChild(row);
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+load();
+const PHASES  = ['in','out'];
+const SUBTABS = ['storage','cooler'];
+PHASES.forEach(ph => SUBTABS.forEach(sub => renderView('ALL',ph,sub)));
+updateCoolerTab();
+updateProgress();
+</script>
+
+<script>
+// ── PWA: inject manifest & register service worker ────────────────────
+(function() {
+  // Manifest
+  const manifest = {
+    name: "Lamppost Cocktail Stand Sheet",
+    short_name: "Stand Sheet",
+    description: "Pre-event inventory count tool",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#1a1a2e",
+    theme_color: "#16213e",
+    orientation: "portrait",
+    icons: [
+      {
+        src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2316213e' rx='24'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='110' font-family='sans-serif'>🍺</text></svg>`),
+        sizes: "192x192",
+        type: "image/svg+xml"
+      },
+      {
+        src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2316213e' rx='64'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='300' font-family='sans-serif'>🍺</text></svg>`),
+        sizes: "512x512",
+        type: "image/svg+xml"
+      }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  document.getElementById('pwa-manifest').setAttribute('href', url);
+
+  // Service Worker — cache everything for offline use
+  if('serviceWorker' in navigator) {
+    const swCode = `
+const CACHE = 'standsheet-v1';
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(['./', './index.html']))
+      .catch(()=>{}) // fine if no index.html
+  );
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      if(cached) return cached;
+      return fetch(e.request).then(resp => {
+        if(!resp || resp.status !== 200 || resp.type === 'opaque') return resp;
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return resp;
+      }).catch(() => cached);
+    })
+  );
+});
+`;
+    const swBlob = new Blob([swCode], {type:'text/javascript'});
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, {scope: './'})
+      .then(() => console.log('SW registered'))
+      .catch(e => console.warn('SW failed:', e));
+  }
+})();
+</script>
+</body>
+</html>
