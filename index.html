@@ -565,6 +565,10 @@ const counts = {};
 
 function load() { try { const s=localStorage.getItem('lp_ss3'); if(s) Object.assign(counts,JSON.parse(s)); } catch(e){} }
 function save() { try { localStorage.setItem('lp_ss3', JSON.stringify(counts)); } catch(e){} }
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+function escapeAttr(value) { return escapeHTML(value); }
 
 // Custom keg names stored separately
 function getCustomName(sheet, n) { return counts['customname|ALL|'+n] || ''; }
@@ -832,31 +836,15 @@ function renderView(sheet, phase, subtab) {
 
     // Name cell — editable for custom kegs
     const customName = item.custom ? getCustomName(isheet, item.n) : '';
-    let nameHTML;
-    if(item.custom) {
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'item-name';
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.className = 'custom-name-input';
-      inp.value = customName;
-      inp.placeholder = item.customLabel;
-      inp.addEventListener('change', e => setCustomName(isheet, item.n, e.target.value));
-      inp.addEventListener('input',  e => setCustomName(isheet, item.n, e.target.value));
-      const sm = document.createElement('small');
-      sm.textContent = 'Keg';
-      nameDiv.appendChild(inp);
-      nameDiv.appendChild(sm);
-      nameHTML = nameDiv.outerHTML;
-    } else {
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'item-name';
-      nameDiv.textContent = item.name;
-      const sm = document.createElement('small');
-      sm.textContent = item.sub;
-      nameDiv.appendChild(sm);
-      nameHTML = nameDiv.outerHTML;
-    }
+    const nameHTML = item.custom
+      ? `<div class="item-name">
+           <input type="text" class="custom-name-input" value="${escapeAttr(customName)}"
+             placeholder="${escapeAttr(item.customLabel)}"
+             onchange="setCustomName('${isheet}',${item.n},this.value)"
+             oninput="setCustomName('${isheet}',${item.n},this.value)">
+           <small>Keg</small>
+         </div>`
+      : `<div class="item-name">${escapeHTML(item.name)}<small>${escapeHTML(item.sub)}</small></div>`;
 
     // ── top row: # | name | [ref cells] | total ──
     // Total cell ID encodes the subtab so storage/cooler tabs have separate cells
@@ -937,7 +925,7 @@ function renderTranscribe(sheet) {
     const hasOut   = hasOutS || hasOutC;
     row.innerHTML = `
       <div class="tr-num">${item.n}</div>
-      <div class="tr-name">${displayName}<small>${item.sub}</small></div>
+      <div class="tr-name">${escapeHTML(displayName)}<small>${escapeHTML(item.sub)}</small></div>
       <div class="tr-val${hasIn?' has-val':''}">${hasIn?totalIn:'—'}</div>
       <div class="tr-val blue${hasOut?' has-val':''}">${hasOut?totalOut:'—'}</div>`;
     container.appendChild(row);
