@@ -1,8 +1,8 @@
-const CACHE = 'standsheet-v2';
+const CACHE = 'standsheet-v3';
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['./', './index.html', './sw.js']))
+    caches.open(CACHE).then(c => c.addAll(['./', './index.html', './sw.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png']))
       .catch(() => {})
   );
   self.skipWaiting();

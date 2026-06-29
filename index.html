@@ -8,7 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Stand Sheet">
 <meta name="theme-color" content="#16213e">
-<link rel="manifest" id="pwa-manifest">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>Lamppost Cocktail — Stand Sheet</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1095,36 +1096,8 @@ updateCurrentShowDisplay(_curShow || (_prevShow ? 'New Show · From: ' + _prevSh
 </script>
 
 <script>
-// ── PWA: inject manifest & register service worker ────────────────────
+// ── PWA: register service worker ──────────────────────────────────────
 (function() {
-  // Manifest
-  const manifest = {
-    name: "Lamppost Cocktail Stand Sheet",
-    short_name: "Stand Sheet",
-    description: "Pre-event inventory count tool",
-    start_url: "./",
-    display: "standalone",
-    background_color: "#1a1a2e",
-    theme_color: "#16213e",
-    orientation: "portrait",
-    icons: [
-      {
-        src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2316213e' rx='24'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='110' font-family='sans-serif'>🍺</text></svg>`),
-        sizes: "192x192",
-        type: "image/svg+xml"
-      },
-      {
-        src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2316213e' rx='64'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='300' font-family='sans-serif'>🍺</text></svg>`),
-        sizes: "512x512",
-        type: "image/svg+xml"
-      }
-    ]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-  const url  = URL.createObjectURL(blob);
-  document.getElementById('pwa-manifest').setAttribute('href', url);
-
-  // Service Worker — register real sw.js for offline use
   if('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(() => console.log('SW registered'))
