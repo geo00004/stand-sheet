@@ -234,6 +234,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 }
 .tr-val.has-val { color: #e2b04a; border-color: #3a3010; }
 .tr-val.blue.has-val { color: #60a0e0; border-color: #103060; }
+.save-banner {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: #0d0d1e; border-top: 2px solid #1a1a3a;
   padding: 7px 12px; display: flex;
@@ -668,12 +669,14 @@ function updateProgress() {
   const data = ALL_ITEMS;
   let filled=0;
   data.forEach(item => {
-    if(grandHas(activeSheet, activePhase, item.n)) filled++;
+    const is = item.sheet || 'C';
+    if(grandHas(is, activePhase, item.n)) filled++;
   });
   const pct = Math.round(filled/data.length*100);
-  document.getElementById('pfill').style.width = pct+'%';
-  document.getElementById('ptext').textContent = filled+' of '+data.length+' touched · '+pct+'%';
-  document.getElementById('filled-count').textContent = filled+' filled';
+  const pfill = document.getElementById('pfill');
+  const ptext = document.getElementById('ptext');
+  if(pfill) pfill.style.width = pct+'%';
+  if(ptext) ptext.textContent = filled+' of '+data.length+' touched · '+pct+'%';
 }
 
 // Returns true if the current sheet has ANY items that need a cooler
@@ -829,15 +832,31 @@ function renderView(sheet, phase, subtab) {
 
     // Name cell — editable for custom kegs
     const customName = item.custom ? getCustomName(isheet, item.n) : '';
-    const nameHTML = item.custom
-      ? `<div class="item-name">
-           <input type="text" class="custom-name-input" value="${customName}"
-             placeholder="${item.customLabel}"
-             onchange="setCustomName('${isheet}',${item.n},this.value)"
-             oninput="setCustomName('${isheet}',${item.n},this.value)">
-           <small>Keg</small>
-         </div>`
-      : `<div class="item-name">${item.name}<small>${item.sub}</small></div>`;
+    let nameHTML;
+    if(item.custom) {
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'custom-name-input';
+      inp.value = customName;
+      inp.placeholder = item.customLabel;
+      inp.addEventListener('change', e => setCustomName(isheet, item.n, e.target.value));
+      inp.addEventListener('input',  e => setCustomName(isheet, item.n, e.target.value));
+      const sm = document.createElement('small');
+      sm.textContent = 'Keg';
+      nameDiv.appendChild(inp);
+      nameDiv.appendChild(sm);
+      nameHTML = nameDiv.outerHTML;
+    } else {
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'item-name';
+      nameDiv.textContent = item.name;
+      const sm = document.createElement('small');
+      sm.textContent = item.sub;
+      nameDiv.appendChild(sm);
+      nameHTML = nameDiv.outerHTML;
+    }
 
     // ── top row: # | name | [ref cells] | total ──
     // Total cell ID encodes the subtab so storage/cooler tabs have separate cells
@@ -1035,12 +1054,24 @@ function populateShowList() {
   keys.forEach(k => {
     const row = document.createElement('div');
     row.className = 'show-item';
-    row.innerHTML = `
-      <div>
-        <div class="show-item-name">${k}</div>
-        <div class="show-item-date">${shows[k].date}</div>
-      </div>
-      <button class="show-item-del" onclick="deleteShow('${k.replace(/'/g,"\'")}');event.stopPropagation()">✕</button>`;
+
+    const info = document.createElement('div');
+    const nameEl = document.createElement('div');
+    nameEl.className = 'show-item-name';
+    nameEl.textContent = k;
+    const dateEl = document.createElement('div');
+    dateEl.className = 'show-item-date';
+    dateEl.textContent = shows[k].date;
+    info.appendChild(nameEl);
+    info.appendChild(dateEl);
+
+    const del = document.createElement('button');
+    del.className = 'show-item-del';
+    del.textContent = '✕';
+    del.addEventListener('click', e => { e.stopPropagation(); deleteShow(k); });
+
+    row.appendChild(info);
+    row.appendChild(del);
     list.appendChild(row);
   });
 }
@@ -1095,40 +1126,9 @@ document.getElementById('current-show-label').textContent = _curShow || 'No show
   const url  = URL.createObjectURL(blob);
   document.getElementById('pwa-manifest').setAttribute('href', url);
 
-  // Service Worker — cache everything for offline use
+  // Service Worker — register real sw.js for offline use
   if('serviceWorker' in navigator) {
-    const swCode = `
-const CACHE = 'standsheet-v1';
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['./', './index.html']))
-      .catch(()=>{}) // fine if no index.html
-  );
-  self.skipWaiting();
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
-  ));
-  self.clients.claim();
-});
-self.addEventListener('fetch', e => {
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if(cached) return cached;
-      return fetch(e.request).then(resp => {
-        if(!resp || resp.status !== 200 || resp.type === 'opaque') return resp;
-        const clone = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return resp;
-      }).catch(() => cached);
-    })
-  );
-});
-`;
-    const swBlob = new Blob([swCode], {type:'text/javascript'});
-    const swUrl  = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, {scope: './'})
+    navigator.serviceWorker.register('./sw.js')
       .then(() => console.log('SW registered'))
       .catch(e => console.warn('SW failed:', e));
   }
