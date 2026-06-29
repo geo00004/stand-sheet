@@ -64,13 +64,8 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
   letter-spacing: 0.07em; text-transform: uppercase;
   border: none; border-radius: 4px; cursor: pointer; transition: all 0.15s;
 }
-.btn-sort   { background: #e2b04a; color: #1a1a2e; }
-.btn-sort:hover { background: #f0c060; }
-.btn-revert { background: #0f3460; color: #e2b04a; border: 1px solid #e2b04a; }
-.btn-revert:hover { background: #1a4a80; }
 .btn-clear  { background: #2a1010; color: #e06060; border: 1px solid #703030; }
 .btn-clear:hover { background: #3a1818; }
-.sort-label { font-size: 10px; color: #444466; margin-left: auto; font-style: italic; }
 
 /* Progress */
 .progress-wrap {
@@ -306,10 +301,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 </div>
 
 <div class="controls">
-  <button class="btn btn-sort"   onclick="sortItems()">↕ Sort by Category</button>
-  <button class="btn btn-revert" onclick="revertOrder()">↩ Sheet Order</button>
   <button class="btn btn-clear"  onclick="clearView()">✕ Clear</button>
-  <span class="sort-label" id="sort-label">Sheet order</span>
 </div>
 <div class="progress-wrap">
   <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
@@ -554,14 +546,11 @@ const ALL_ITEMS = [
 
 const EXTRA = 3;
 const NEEDS_BOTH = new Set(['Beer','White Wine','Rosé','Red Wine','Soda']);
-// Wine subcats always sort A-Z by name
-const WINE_CATS = new Set(['White Wine','Rosé','Red Wine','Bar Mix & Juices']);
 
 // ── STATE ─────────────────────────────────────────────────────────────
 let activeSheet  = 'ALL'; // unified
 let activePhase  = 'in';   // 'in' | 'out'
 let activeSubtab = 'storage'; // 'storage' | 'cooler'
-const sortedState = {};  // key: "sheet-phase-subtab" -> bool
 const counts = {};
 
 function load() { try { const s=localStorage.getItem('lp_ss3'); if(s) Object.assign(counts,JSON.parse(s)); } catch(e){} }
@@ -723,21 +712,6 @@ function switchSubtab(sub) {
 function showView() {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById(currentViewId()).classList.add('active');
-  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
-  document.getElementById('sort-label').textContent = sortedState[sk] ? 'Sorted A–Z' : 'Sheet order';
-}
-
-function sortItems() {
-  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
-  sortedState[sk]=true;
-  renderView(activeSheet, activePhase, activeSubtab);
-  document.getElementById('sort-label').textContent='A–Z within category';
-}
-function revertOrder() {
-  const sk = 'ALL-'+activePhase+'-'+activeSubtab;
-  sortedState[sk]=false;
-  renderView(activeSheet, activePhase, activeSubtab);
-  document.getElementById('sort-label').textContent='Sheet order within category';
 }
 function clearView() {
   const label = activeSubtab==='storage' ? 'storage' : 'cooler';
@@ -782,7 +756,6 @@ function renderView(sheet, phase, subtab) {
   const container   = document.getElementById(containerId);
   container.innerHTML = '';
   const gridClass = phase+'-'+subtab;
-  const sk = 'ALL-'+phase+'-'+subtab;
 
   // Category display order
   const CAT_ORDER = ['Cups & Merchandise','Soda','Beer','Kegs','White Wine','Rosé','Red Wine','Bar Mix & Juices','Liquor'];
@@ -791,14 +764,12 @@ function renderView(sheet, phase, subtab) {
   let items = [...data];
   // Cooler tab: skip storage-only items
   if(subtab==='cooler') items = items.filter(i=>!i.storOnly);
-  // Sort: always by category order; wines always A-Z; others by name if sorted flag set, else sheet order
+  // Sort entry views by category, then by name. Transcribe stays in sheet order.
   items.sort((a,b)=>{
     const cr = catRank(a.cat)-catRank(b.cat);
     if(cr!==0) return cr;
-    if(WINE_CATS.has(a.cat)) return a.name.localeCompare(b.name);
     if(a.sortKey !== undefined && b.sortKey !== undefined) return a.sortKey - b.sortKey;
-    if(sortedState[sk]) return a.name.localeCompare(b.name);
-    return a.n-b.n;
+    return a.name.localeCompare(b.name) || a.n-b.n;
   });
 
   let lastCat = null;
