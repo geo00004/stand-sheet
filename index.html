@@ -290,7 +290,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 
 <div id="top-header">
   <h1>Lamppost Cocktail · Stand Sheet</h1>
-  <p>6/28/2026 · Wynonna Judd &amp; Melissa Etheridge · 8:00 AM</p>
+  <p id="top-show-label">Current show: New Show</p>
 
 </div>
 
@@ -942,6 +942,13 @@ function loadShows() {
 function saveShows(shows) {
   try { localStorage.setItem(SHOWS_KEY, JSON.stringify(shows)); } catch(e) {}
 }
+function updateCurrentShowDisplay(label) {
+  const display = label || 'New Show';
+  const current = document.getElementById('current-show-label');
+  const top = document.getElementById('top-show-label');
+  if(current) current.textContent = display;
+  if(top) top.textContent = 'Current show: ' + display;
+}
 
 function openSaveShow() {
   document.getElementById('show-modal-title').textContent = '💾 Save Show';
@@ -976,7 +983,7 @@ function confirmSaveShow() {
   };
   saveShows(shows);
   localStorage.setItem('lp_current_show', name);
-  document.getElementById('current-show-label').textContent = name;
+  updateCurrentShowDisplay(name);
   closeShowOverlay();
   alert('Show saved: ' + name);
 }
@@ -999,6 +1006,8 @@ function confirmNewShow() {
         if(k.includes('|out|')) {
           const newKey = k.replace('|out|', '|in|');
           counts[newKey] = v;
+        } else if(k.startsWith('customname|')) {
+          counts[k] = v;
         }
       });
       // Store prev show name for reference display
@@ -1009,7 +1018,7 @@ function confirmNewShow() {
   }
 
   localStorage.setItem('lp_current_show', '');
-  document.getElementById('current-show-label').textContent = selected ? 'From: ' + selected : 'New Show';
+  updateCurrentShowDisplay(selected ? 'New Show · From: ' + selected : 'New Show');
   save();
   closeShowOverlay();
 
@@ -1081,7 +1090,8 @@ updateCoolerTab();
 updateProgress();
 // Restore current show label
 const _curShow = localStorage.getItem('lp_current_show') || '';
-document.getElementById('current-show-label').textContent = _curShow || 'No show loaded';
+const _prevShow = localStorage.getItem('lp_prev_show') || '';
+updateCurrentShowDisplay(_curShow || (_prevShow ? 'New Show · From: ' + _prevShow : 'New Show'));
 </script>
 
 <script>
