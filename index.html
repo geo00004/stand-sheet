@@ -207,7 +207,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 
 .transcribe-col-hdr {
   display: grid;
-  grid-template-columns: 28px 1fr 52px 52px 52px 52px;
+  grid-template-columns: 28px 1fr 58px 58px;
   gap: 3px; padding: 6px 12px 5px;
   background: #111128; border-bottom: 1px solid #252545;
   flex-shrink: 0;
@@ -219,7 +219,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 
 .tr-row {
   display: grid;
-  grid-template-columns: 28px 1fr 52px 52px 52px 52px;
+  grid-template-columns: 28px 1fr 58px 58px;
   gap: 3px; align-items: center;
   padding: 7px 12px; border-bottom: 1px solid #111128;
 }
@@ -373,10 +373,8 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
   <div class="transcribe-col-hdr">
     <div class="ch">#</div>
     <div class="ch left">Item</div>
-    <div class="ch" style="color:#60c090">In Storage</div>
-    <div class="ch" style="color:#60c090">In Cooler</div>
-    <div class="ch" style="color:#60a0e0">Out Storage</div>
-    <div class="ch" style="color:#60a0e0">Out Cooler</div>
+    <div class="ch" style="color:#60c090">Count In</div>
+    <div class="ch" style="color:#60a0e0">Count Out</div>
   </div>
   <div id="transcribe-body">
     <div id="tr-list-ALL"></div>
@@ -914,13 +912,15 @@ function renderTranscribe(sheet) {
     const displayName = item.custom ? (getCustomName(is, item.n) || item.customLabel) : item.name;
     const row = document.createElement('div');
     row.className = 'tr-row'+(anyData?' has-data':'');
+    const totalIn  = inS + inC;
+    const totalOut = outS + outC;
+    const hasIn    = hasInS || hasInC;
+    const hasOut   = hasOutS || hasOutC;
     row.innerHTML = `
       <div class="tr-num">${item.n}</div>
       <div class="tr-name">${displayName}<small>${item.sub}</small></div>
-      <div class="tr-val${hasInS?' has-val':''}">${hasInS?inS:'—'}</div>
-      <div class="tr-val${hasInC?' has-val':''}">${item.storOnly?'—':(hasInC?inC:'—')}</div>
-      <div class="tr-val blue${hasOutS?' has-val':''}">${hasOutS?outS:'—'}</div>
-      <div class="tr-val blue${hasOutC?' has-val':''}">${item.storOnly?'—':(hasOutC?outC:'—')}</div>`;
+      <div class="tr-val${hasIn?' has-val':''}">${hasIn?totalIn:'—'}</div>
+      <div class="tr-val blue${hasOut?' has-val':''}">${hasOut?totalOut:'—'}</div>`;
     container.appendChild(row);
   });
 }
