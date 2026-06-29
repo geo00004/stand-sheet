@@ -278,6 +278,12 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 .show-item:hover { background: #111128; border-color: #e2b04a; }
 .show-item-name { font-size: 13px; font-weight: 600; color: #c0c0da; }
 .show-item-date { font-size: 10px; color: #444466; }
+.show-item-actions { display: flex; gap: 5px; margin-left: 8px; }
+.show-item-load, .show-item-seed {
+  font-size: 10px; color: #e2b04a; padding: 3px 6px;
+  background: #0f3460; border-radius: 4px; border: 1px solid #2a5a90; cursor: pointer;
+}
+.show-item-seed { color: #60c090; border-color: #286848; background: #0d2a18; }
 .show-item-del { font-size: 11px; color: #703030; padding: 2px 6px; background: #2a1010; border-radius: 4px; border: none; cursor: pointer; }
 #current-show-label { font-size: 10px; color: #e2b04a; font-style: italic; }
 </style>
@@ -411,7 +417,7 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
 
 
 <div class="save-banner">
-  <button onclick="openNewShow()" style="padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1px solid #e2b04a;border-radius:4px;background:transparent;color:#e2b04a;cursor:pointer;">＋ New Show</button>
+  <button onclick="openNewShow()" style="padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1px solid #e2b04a;border-radius:4px;background:transparent;color:#e2b04a;cursor:pointer;">＋ New / Shows</button>
   <button onclick="openTranscribe()" style="padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;border:1px solid #60a0e0;border-radius:4px;background:transparent;color:#60a0e0;cursor:pointer;">📋 Transcribe</button>
   <span id="current-show-label">No show loaded</span>
 </div>
@@ -556,7 +562,10 @@ let activeSubtab = 'storage'; // 'storage' | 'cooler'
 const counts = {};
 
 function load() { try { const s=localStorage.getItem('lp_ss3'); if(s) Object.assign(counts,JSON.parse(s)); } catch(e){} }
-function save() { try { localStorage.setItem('lp_ss3', JSON.stringify(counts)); } catch(e){} }
+function save() {
+  try { localStorage.setItem('lp_ss3', JSON.stringify(counts)); } catch(e){}
+  autosaveCurrentShow();
+}
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
@@ -866,7 +875,6 @@ let transcribeSheet = 'C';
 function openTranscribe() {
   renderTranscribe('ALL');
   document.getElementById('transcribe-overlay').classList.add('active');
-  setTimeout(() => openSaveShow(), 600);
 }
 function closeTranscribe() {
   document.getElementById('transcribe-overlay').classList.remove('active');
@@ -916,12 +924,57 @@ function loadShows() {
 function saveShows(shows) {
   try { localStorage.setItem(SHOWS_KEY, JSON.stringify(shows)); } catch(e) {}
 }
+function cloneCounts() {
+  return JSON.parse(JSON.stringify(counts));
+}
+function currentShowName() {
+  return localStorage.getItem('lp_current_show') || '';
+}
+function currentPrevShowName() {
+  return localStorage.getItem('lp_prev_show') || '';
+}
+function autosaveCurrentShow() {
+  const name = currentShowName();
+  if(!name) return;
+  const shows = loadShows();
+  const prev = shows[name] || {};
+  const now = new Date().toLocaleString();
+  shows[name] = {
+    ...prev,
+    name,
+    date: prev.date || new Date().toLocaleDateString(),
+    updated: now,
+    prevShow: currentPrevShowName(),
+    counts: cloneCounts()
+  };
+  saveShows(shows);
+}
 function updateCurrentShowDisplay(label) {
   const display = label || 'New Show';
   const current = document.getElementById('current-show-label');
   const top = document.getElementById('top-show-label');
   if(current) current.textContent = display;
   if(top) top.textContent = 'Current show: ' + display;
+}
+function displayNameForShow(name, prevName) {
+  return prevName ? name + ' · From: ' + prevName : name;
+}
+function replaceActiveCounts(nextCounts) {
+  Object.keys(counts).forEach(k => delete counts[k]);
+  Object.assign(counts, JSON.parse(JSON.stringify(nextCounts || {})));
+}
+function copyPreviousOutToCurrentIn(prevCounts) {
+  Object.entries(prevCounts || {}).forEach(([k, v]) => {
+    if(k.includes('|out|')) {
+      counts[k.replace('|out|', '|in|')] = v;
+    } else if(k.startsWith('customname|')) {
+      counts[k] = v;
+    }
+  });
+}
+function refreshAllViews() {
+  PHASES.forEach(ph => SUBTABS.forEach(sub => renderView('ALL', ph, sub)));
+  updateProgress();
 }
 
 function openSaveShow() {
@@ -935,9 +988,10 @@ function openSaveShow() {
 }
 
 function openNewShow() {
-  document.getElementById('show-modal-title').textContent = '▶ New Show';
+  document.getElementById('show-modal-title').textContent = '▶ New / Shows';
   document.getElementById('show-save-panel').style.display = 'none';
   document.getElementById('show-new-panel').style.display = '';
+  autosaveCurrentShow();
   populateShowList();
   const nameInput = document.getElementById('new-show-name-input');
   nameInput.value = '';
@@ -952,15 +1006,20 @@ function closeShowOverlay() {
 function confirmSaveShow() {
   const name = document.getElementById('show-name-input').value.trim();
   if(!name) { alert('Please enter a concert name.'); return; }
+  const oldName = currentShowName();
   const shows = loadShows();
+  if(oldName && oldName !== name) delete shows[oldName];
   shows[name] = {
+    ...(shows[name] || {}),
     name,
     date: new Date().toLocaleDateString(),
-    counts: JSON.parse(JSON.stringify(counts)) // deep copy
+    updated: new Date().toLocaleString(),
+    prevShow: currentPrevShowName(),
+    counts: cloneCounts()
   };
   saveShows(shows);
   localStorage.setItem('lp_current_show', name);
-  updateCurrentShowDisplay(name);
+  updateCurrentShowDisplay(displayNameForShow(name, currentPrevShowName()));
   closeShowOverlay();
   alert('Show saved: ' + name);
 }
@@ -969,46 +1028,81 @@ function confirmNewShow() {
   const name = document.getElementById('new-show-name-input').value.trim();
   const selected = document.getElementById('show-select').value;
   if(!name) { alert('Please enter a show name.'); return; }
+  const existingShows = loadShows();
+  if(existingShows[name]) {
+    alert('A saved show with that name already exists. Load it from Saved Shows, or choose a different name.');
+    return;
+  }
   if(!confirm('Start "' + name + '"? Current counts will be cleared.')) return;
+
+  autosaveCurrentShow();
 
   // Clear current counts
   Object.keys(counts).forEach(k => delete counts[k]);
 
   // If a previous show selected, pre-fill Count In from its Count Out
+  let seededFrom = '';
   if(selected) {
     const shows = loadShows();
     const prev = shows[selected];
     if(prev && prev.counts) {
-      // Copy out counts -> in counts
-      Object.entries(prev.counts).forEach(([k, v]) => {
-        // key format: sheet|phase|n|field
-        if(k.includes('|out|')) {
-          const newKey = k.replace('|out|', '|in|');
-          counts[newKey] = v;
-        } else if(k.startsWith('customname|')) {
-          counts[k] = v;
-        }
-      });
-      // Store prev show name for reference display
-      localStorage.setItem('lp_prev_show', selected);
+      copyPreviousOutToCurrentIn(prev.counts);
+      seededFrom = selected;
     }
+    localStorage.setItem('lp_prev_show', selected);
   } else {
     localStorage.removeItem('lp_prev_show');
   }
 
   localStorage.setItem('lp_current_show', name);
-  updateCurrentShowDisplay(selected ? name + ' · From: ' + selected : name);
+  updateCurrentShowDisplay(displayNameForShow(name, seededFrom));
   save();
   closeShowOverlay();
+  refreshAllViews();
+}
 
-  // Re-render everything
-  PHASES.forEach(ph => SUBTABS.forEach(sub => renderView('ALL', ph, sub)));
-  updateProgress();
+function loadShow(name) {
+  const shows = loadShows();
+  const show = shows[name];
+  if(!show || !show.counts) return;
+  if(!confirm('Load "' + name + '"? Your current show will be autosaved first.')) return;
+  autosaveCurrentShow();
+  replaceActiveCounts(show.counts);
+  localStorage.setItem('lp_current_show', name);
+  if(show.prevShow) localStorage.setItem('lp_prev_show', show.prevShow);
+  else localStorage.removeItem('lp_prev_show');
+  updateCurrentShowDisplay(displayNameForShow(name, show.prevShow));
+  save();
+  closeShowOverlay();
+  refreshAllViews();
+}
+
+function useFinalCountFromShow(name) {
+  const shows = loadShows();
+  const show = shows[name];
+  if(!show || !show.counts) return;
+  const activeName = currentShowName();
+  if(!activeName) { alert('Start or load a current show first.'); return; }
+  if(!confirm('Use "' + name + '" Count Out as the starting Count In for "' + activeName + '"? Existing Count In values will be replaced.')) return;
+  autosaveCurrentShow();
+  Object.keys(counts).forEach(k => {
+    if(k.includes('|in|') || k.startsWith('customname|')) delete counts[k];
+  });
+  copyPreviousOutToCurrentIn(show.counts);
+  localStorage.setItem('lp_prev_show', name);
+  updateCurrentShowDisplay(displayNameForShow(activeName, name));
+  save();
+  closeShowOverlay();
+  refreshAllViews();
 }
 
 function populateShowList() {
   const shows = loadShows();
-  const keys  = Object.keys(shows).reverse(); // newest first
+  const keys  = Object.keys(shows).sort((a,b) => {
+    const ad = Date.parse(shows[a].updated || shows[a].date || '') || 0;
+    const bd = Date.parse(shows[b].updated || shows[b].date || '') || 0;
+    return bd - ad;
+  });
 
   // Populate dropdown
   const sel = document.getElementById('show-select');
@@ -1030,6 +1124,7 @@ function populateShowList() {
   keys.forEach(k => {
     const row = document.createElement('div');
     row.className = 'show-item';
+    row.addEventListener('click', () => loadShow(k));
 
     const info = document.createElement('div');
     const nameEl = document.createElement('div');
@@ -1037,17 +1132,30 @@ function populateShowList() {
     nameEl.textContent = k;
     const dateEl = document.createElement('div');
     dateEl.className = 'show-item-date';
-    dateEl.textContent = shows[k].date;
+    dateEl.textContent = shows[k].updated || shows[k].date;
     info.appendChild(nameEl);
     info.appendChild(dateEl);
 
+    const actions = document.createElement('div');
+    actions.className = 'show-item-actions';
+    const load = document.createElement('button');
+    load.className = 'show-item-load';
+    load.textContent = 'Load';
+    load.addEventListener('click', e => { e.stopPropagation(); loadShow(k); });
+    const seed = document.createElement('button');
+    seed.className = 'show-item-seed';
+    seed.textContent = 'Use Final';
+    seed.addEventListener('click', e => { e.stopPropagation(); useFinalCountFromShow(k); });
     const del = document.createElement('button');
     del.className = 'show-item-del';
     del.textContent = '✕';
     del.addEventListener('click', e => { e.stopPropagation(); deleteShow(k); });
 
     row.appendChild(info);
-    row.appendChild(del);
+    actions.appendChild(load);
+    actions.appendChild(seed);
+    actions.appendChild(del);
+    row.appendChild(actions);
     list.appendChild(row);
   });
 }
@@ -1057,6 +1165,11 @@ function deleteShow(name) {
   const shows = loadShows();
   delete shows[name];
   saveShows(shows);
+  if(currentShowName() === name) {
+    localStorage.removeItem('lp_current_show');
+    localStorage.removeItem('lp_prev_show');
+    updateCurrentShowDisplay('New Show');
+  }
   populateShowList();
 }
 
