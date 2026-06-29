@@ -241,6 +241,48 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
   font-size: 11px; color: #444466; z-index: 300;
 }
 .save-banner strong { color: #e2b04a; }
+
+/* ── SHOW MANAGEMENT OVERLAY ── */
+#show-overlay {
+  display: none; position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+}
+#show-overlay.active { display: flex; }
+#show-modal {
+  background: #16213e; border: 2px solid #e2b04a; border-radius: 12px;
+  padding: 24px 20px; width: 90%; max-width: 400px;
+}
+#show-modal h2 { font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #e2b04a; margin-bottom: 16px; }
+#show-modal input[type=text], #show-modal select {
+  width: 100%; padding: 10px 12px; font-size: 14px; font-weight: 600;
+  background: #0d0d22; border: 1px solid #252545; border-radius: 6px;
+  color: #e8e8f0; margin-bottom: 12px; outline: none;
+}
+#show-modal input[type=text]:focus, #show-modal select:focus { border-color: #e2b04a; }
+#show-modal select option { background: #0d0d22; }
+.show-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+.show-btn {
+  flex: 1; padding: 10px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  border: none; border-radius: 6px; cursor: pointer;
+}
+.show-btn-primary { background: #e2b04a; color: #1a1a2e; }
+.show-btn-secondary { background: #0f3460; color: #e2b04a; border: 1px solid #e2b04a; }
+.show-btn-danger { background: #2a1010; color: #e06060; border: 1px solid #703030; }
+.show-label { font-size: 10px; color: #555577; margin-bottom: 6px; display: block; letter-spacing: 0.05em; text-transform: uppercase; }
+.show-divider { border: none; border-top: 1px solid #252545; margin: 16px 0; }
+#show-list { max-height: 180px; overflow-y: auto; margin-bottom: 12px; }
+.show-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-radius: 6px; margin-bottom: 4px;
+  background: #0d0d22; border: 1px solid #1a1a36; cursor: pointer;
+  transition: background 0.15s;
+}
+.show-item:hover { background: #111128; border-color: #e2b04a; }
+.show-item-name { font-size: 13px; font-weight: 600; color: #c0c0da; }
+.show-item-date { font-size: 10px; color: #444466; }
+.show-item-del { font-size: 11px; color: #703030; padding: 2px 6px; background: #2a1010; border-radius: 4px; border: none; cursor: pointer; }
+#current-show-label { font-size: 10px; color: #e2b04a; font-style: italic; }
 </style>
 </head>
 <body>
@@ -341,10 +383,43 @@ body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #1a1a2e; co
   </div>
 </div>
 
+<!-- SHOW MANAGEMENT OVERLAY -->
+<div id="show-overlay">
+  <div id="show-modal">
+    <h2 id="show-modal-title">Save Show</h2>
+
+    <!-- Save panel -->
+    <div id="show-save-panel">
+      <span class="show-label">Concert Name</span>
+      <input type="text" id="show-name-input" placeholder="e.g. Wynonna Judd 6/28">
+      <div class="show-btn-row">
+        <button class="show-btn show-btn-primary" onclick="confirmSaveShow()">💾 Save</button>
+        <button class="show-btn show-btn-secondary" onclick="closeShowOverlay()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- New show panel -->
+    <div id="show-new-panel" style="display:none">
+      <span class="show-label">Start fresh — optionally load a previous show's Count Out as your starting Count In</span>
+      <select id="show-select">
+        <option value="">— Start blank —</option>
+      </select>
+      <div class="show-btn-row">
+        <button class="show-btn show-btn-primary" onclick="confirmNewShow()">▶ Begin New Show</button>
+        <button class="show-btn show-btn-secondary" onclick="closeShowOverlay()">Cancel</button>
+      </div>
+      <hr class="show-divider">
+      <span class="show-label">Saved Shows</span>
+      <div id="show-list"></div>
+    </div>
+  </div>
+</div>
+
+
 <div class="save-banner">
-  <span>Auto-saved</span>
-  <button onclick="openTranscribe()" style="padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;border:1px solid #60a0e0;border-radius:4px;background:transparent;color:#60a0e0;cursor:pointer;">📋 Transcribe</button>
-  <strong id="filled-count">—</strong>
+  <button onclick="openNewShow()" style="padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1px solid #e2b04a;border-radius:4px;background:transparent;color:#e2b04a;cursor:pointer;">＋ New Show</button>
+  <button onclick="openTranscribe()" style="padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;border:1px solid #60a0e0;border-radius:4px;background:transparent;color:#60a0e0;cursor:pointer;">📋 Transcribe</button>
+  <span id="current-show-label">No show loaded</span>
 </div>
 
 <script>
@@ -812,6 +887,7 @@ let transcribeSheet = 'C';
 function openTranscribe() {
   renderTranscribe('ALL');
   document.getElementById('transcribe-overlay').classList.add('active');
+  setTimeout(() => openSaveShow(), 600);
 }
 function closeTranscribe() {
   document.getElementById('transcribe-overlay').classList.remove('active');
@@ -849,6 +925,134 @@ function renderTranscribe(sheet) {
   });
 }
 
+
+// ── SHOW MANAGEMENT ───────────────────────────────────────────────────
+const SHOWS_KEY = 'lp_shows';
+
+function loadShows() {
+  try { return JSON.parse(localStorage.getItem(SHOWS_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveShows(shows) {
+  try { localStorage.setItem(SHOWS_KEY, JSON.stringify(shows)); } catch(e) {}
+}
+
+function openSaveShow() {
+  document.getElementById('show-modal-title').textContent = '💾 Save Show';
+  document.getElementById('show-save-panel').style.display = '';
+  document.getElementById('show-new-panel').style.display = 'none';
+  // Pre-fill with current show name if set
+  const cur = localStorage.getItem('lp_current_show') || '';
+  document.getElementById('show-name-input').value = cur;
+  document.getElementById('show-overlay').classList.add('active');
+}
+
+function openNewShow() {
+  document.getElementById('show-modal-title').textContent = '▶ New Show';
+  document.getElementById('show-save-panel').style.display = 'none';
+  document.getElementById('show-new-panel').style.display = '';
+  populateShowList();
+  document.getElementById('show-overlay').classList.add('active');
+}
+
+function closeShowOverlay() {
+  document.getElementById('show-overlay').classList.remove('active');
+}
+
+function confirmSaveShow() {
+  const name = document.getElementById('show-name-input').value.trim();
+  if(!name) { alert('Please enter a concert name.'); return; }
+  const shows = loadShows();
+  shows[name] = {
+    name,
+    date: new Date().toLocaleDateString(),
+    counts: JSON.parse(JSON.stringify(counts)) // deep copy
+  };
+  saveShows(shows);
+  localStorage.setItem('lp_current_show', name);
+  document.getElementById('current-show-label').textContent = name;
+  closeShowOverlay();
+  alert('Show saved: ' + name);
+}
+
+function confirmNewShow() {
+  const selected = document.getElementById('show-select').value;
+  if(!confirm('Start a new show? Current counts will be cleared.')) return;
+
+  // Clear current counts
+  Object.keys(counts).forEach(k => delete counts[k]);
+
+  // If a previous show selected, pre-fill Count In from its Count Out
+  if(selected) {
+    const shows = loadShows();
+    const prev = shows[selected];
+    if(prev && prev.counts) {
+      // Copy out counts -> in counts
+      Object.entries(prev.counts).forEach(([k, v]) => {
+        // key format: sheet|phase|n|field
+        if(k.includes('|out|')) {
+          const newKey = k.replace('|out|', '|in|');
+          counts[newKey] = v;
+        }
+      });
+      // Store prev show name for reference display
+      localStorage.setItem('lp_prev_show', selected);
+    }
+  } else {
+    localStorage.removeItem('lp_prev_show');
+  }
+
+  localStorage.setItem('lp_current_show', '');
+  document.getElementById('current-show-label').textContent = selected ? 'From: ' + selected : 'New Show';
+  save();
+  closeShowOverlay();
+
+  // Re-render everything
+  PHASES.forEach(ph => SUBTABS.forEach(sub => renderView('ALL', ph, sub)));
+  updateProgress();
+}
+
+function populateShowList() {
+  const shows = loadShows();
+  const keys  = Object.keys(shows).reverse(); // newest first
+
+  // Populate dropdown
+  const sel = document.getElementById('show-select');
+  sel.innerHTML = '<option value="">— Start blank —</option>';
+  keys.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = k + ' (' + shows[k].date + ')';
+    sel.appendChild(opt);
+  });
+
+  // Populate list with delete buttons
+  const list = document.getElementById('show-list');
+  list.innerHTML = '';
+  if(keys.length === 0) {
+    list.innerHTML = '<div style="font-size:11px;color:#444466;padding:8px;">No saved shows yet.</div>';
+    return;
+  }
+  keys.forEach(k => {
+    const row = document.createElement('div');
+    row.className = 'show-item';
+    row.innerHTML = `
+      <div>
+        <div class="show-item-name">${k}</div>
+        <div class="show-item-date">${shows[k].date}</div>
+      </div>
+      <button class="show-item-del" onclick="deleteShow('${k.replace(/'/g,"\'")}');event.stopPropagation()">✕</button>`;
+    list.appendChild(row);
+  });
+}
+
+function deleteShow(name) {
+  if(!confirm('Delete show "' + name + '"?')) return;
+  const shows = loadShows();
+  delete shows[name];
+  saveShows(shows);
+  populateShowList();
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────
 load();
 const PHASES  = ['in','out'];
@@ -856,6 +1060,9 @@ const SUBTABS = ['storage','cooler'];
 PHASES.forEach(ph => SUBTABS.forEach(sub => renderView('ALL',ph,sub)));
 updateCoolerTab();
 updateProgress();
+// Restore current show label
+const _curShow = localStorage.getItem('lp_current_show') || '';
+document.getElementById('current-show-label').textContent = _curShow || 'No show loaded';
 </script>
 
 <script>
